@@ -1,7 +1,6 @@
 library(MASS)
 library(psych)
 library(reshape)
-library(Zelig)
 
 ###############################################################
 # L1 Equation
@@ -43,10 +42,8 @@ STEMLong <- function(){
   Black<-as.data.frame(matrix(rep(ifelse(ETHs[,1]==2,1,0)),nrow=n,byrow=FALSE));colMeans(Black)
   Hisp<-as.data.frame(matrix(rep(ifelse(ETHs[,1]==3,1,0)),nrow=n,byrow=FALSE));colMeans(Hisp)
   
-  
   l1mean<-0
   l1sd<-.5
-
   
   ###############################################################
   # L1 error term is known, ITP is unknown
@@ -75,30 +72,28 @@ STEMLong <- function(){
   dat = cbind(ITPis, Black, Hisp)
   colnames(dat) = c("itp", "black", "hisp")
   #Regression model
-
-  m = zelig(itp ~ black + hisp, model = "ls",data = dat)
-  m$
-  # Here I am grabbing the t-values
-  t_value = coef(summary(m))[,"t value"] 
-  t_value
+  
+  m = lm(itp ~ black + hisp,data = dat)
+  m= summary(m)
+  # Here I am grabbing the p-values
+  m = m$coefficients[,4]
 }
 
 # Replicate the function above
-t_values <- replicate(10, STEMLong())
-repNum = 10
-# Tranpose so I can grab the t-values for the variables of interest
-t_valuesT = as.data.frame(t(t_values)); t_valuesT
-t_valuesTimeEth = as.data.frame(cbind(t_valuesT$`time:black`, t_valuesT$`time:hisp`))
-colnames(t_valuesTimeEth)  = c("time_black", "time_hisp")
+pvalues <- replicate(10000, STEMLong())
 
-# Changing the t- values that are less than or equal -2, because we are expecting statistically significantly lower ITP scores.
-t_valuesOnes = as.data.frame(apply(t_valuesTimeEth, 2, function(x){ifelse(x <= -2, 1, 0)}))
-t_valuesPower = as.data.frame(apply(t_valuesOnes, 2, sum))
+pvalues  = t(as.data.frame(pvalues))
+pvalues = pvalues[,2:3]
+
+repNum = 10000
+# Changing the p-values that are less than or equal .05, because we are expecting statistically significantly lower ITP scores.
+pvaluesOnes = as.data.frame(apply(pvalues, 2, function(x){ifelse(x <= .05, 1, 0)}))
+pvaluesPower = as.data.frame(apply(pvaluesOnes, 2, sum))
 n250 = 250
-# Then divide by the total to get the percentage of model that had t-values above 2, which is the power.    
-Power250 = as.data.frame(t(t_valuesPower/repNum))
-PowerB250 = cbind(Power250$time_black, n250)
+# Then divide by the total to get the percentage of model that had pvalues at or below .05, which is the power.    
+Power250 = as.data.frame(t(pvaluesPower/repNum))
+PowerB250 = cbind(Power250$black, n250)
 colnames(PowerB250) = c("Power", "N")
 
-PowerH250 = cbind(Power250$time_hisp, n250)
+PowerH250 = cbind(Power250$hisp, n250)
 colnames(PowerH250) = c("Power", "N")
